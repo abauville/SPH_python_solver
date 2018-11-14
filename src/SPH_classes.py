@@ -22,16 +22,20 @@ class Kernels():
     def __init__(self, h=0.1):
         # kernel factors
         self.h       = h
-        self.poly6_fac      = 315.0/(np.pi * 64.0 * h**9)
         
-        self.spiky_gradientFac      = -45.0/(np.pi        * h**6)
-        
-        self.viscosity_fac          =  15.0/(np.pi *  2.0 * h**3)
-        self.viscosity_laplacianFac =  45.0/(np.pi        * h**6)
+        # coeff 3D
+        self.poly6_fac              = 315.0/(64.0 * np.pi * h**9)     
+        self.spiky_gradientFac      = -45.0/(       np.pi * h**6)
+        self.viscosity_laplacianFac =  45.0/(       np.pi * h**6)
+#        
+#        # coeff 2D
+#        self.poly6_fac              =   4.0/(       np.pi * h**8)        
+#        self.spiky_gradientFac      = -30.0/(       np.pi * h**5)
+#        self.viscosity_laplacianFac =  20.0/( 3.0 * np.pi * h**5)
         
     # Poly 6
     # =====================================================
-    def poly6_computeWeight(self,particleSystem, sqr_r):
+    def poly6_computeWeight(self,sqr_r):
         # i is the index of a given particle
         h = self.h
         fac = self.poly6_fac
@@ -104,7 +108,7 @@ class World():
 class ParticleSystem():
     #                         Init
     # =========================================================
-    def __init__(self,nx=10,ny=10,k=0.1,eta=1.0):
+    def __init__(self,world,nx=10,ny=10,k=0.1,eta=1.0):
         # Constants
         # ================================
         # viscosity
@@ -120,7 +124,8 @@ class ParticleSystem():
         self.ny = ny
         n = nx*ny
         self.n  = n
-        x,y = np.meshgrid(np.linspace(.25,.5,nx),np.linspace(.25,.5,ny))
+#        x,y = np.meshgrid(np.linspace(.25,.5,nx),np.linspace(.25,.5,ny))
+        x,y = np.meshgrid(np.linspace(world.xmin,world.xmax,nx),np.linspace(world.ymin,world.ymax,ny))
         self.x = x.flatten()
         self.y = y.flatten()
         
@@ -153,9 +158,9 @@ class ParticleSystem():
         y = self.y
         h = kernels.h
         # compute distances
-        sqr_r = (x-x[i])**2 + (y-y[i])**2
-        J = sqr_r>h**2
-        # /!\ Maybe I should ask a condition to exclude i from J
+        sqr_r = (x[i]-x)**2 + (y[i]-y)**2
+        J = sqr_r<h**2
+#        J[i] = False
         
         sqr_r = sqr_r[J]
         r = np.sqrt(sqr_r)
@@ -176,7 +181,7 @@ class ParticleSystem():
     #               Compute Density, Pressure
     # =========================================================
     def computeDensity(self,i,J,sqr_r,kernels):
-        W = kernels.poly6_computeWeight(self,sqr_r)
+        W = kernels.poly6_computeWeight(sqr_r)
         self.rho[i] = np.sum(self.mass[J]*W)
         
         
