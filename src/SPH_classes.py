@@ -79,7 +79,7 @@ class Kernels():
 # =============================================================================
 #                                 World
 class World():
-    def __init__(self,dt=0.001,
+    def __init__(self,dt=0.01,
                  xmin = 0.0, xmax = 1.0,
                  ymin = 0.0, ymax = 1.0,
                  ):
@@ -125,7 +125,10 @@ class ParticleSystem():
         n = nx*ny
         self.n  = n
 #        x,y = np.meshgrid(np.linspace(.25,.5,nx),np.linspace(.25,.5,ny))
-        x,y = np.meshgrid(np.linspace(world.xmin,world.xmax,nx),np.linspace(world.ymin,world.ymax,ny))
+        dx = (world.xmax-world.xmin)/(nx+2)
+        dy = (world.ymax-world.ymin)/(ny+2)
+        x,y = np.meshgrid(np.linspace(world.xmin+dx,world.xmax-dx,nx),np.linspace(world.ymin+dy,world.ymax-dy,ny))
+#        x,y = np.meshgrid(np.linspace(world.xmin+dx,world.xmax-dx,nx),np.linspace(world.ymin+dy,world.ymax-dy,ny))
         dx = x[0,1] - x[0,0]
         dy = y[1,0] - y[0,0]
         self.x = x.flatten()
@@ -137,7 +140,7 @@ class ParticleSystem():
         self.vy = np.zeros(n)
         
         # mass
-        self.mass = np.ones(n)*dx*dy*np.pi
+        self.mass = np.ones(n)*dx*dy*np.pi / (np.max(x)-np.min(x)) / (np.max(y)-np.min(y))
         
         # density
         self.rho  = np.zeros(n)
