@@ -82,13 +82,17 @@ class World():
     def __init__(self,dt=0.01,
                  xmin = 0.0, xmax = 1.0,
                  ymin = 0.0, ymax = 1.0,
-                 ):
+                 boundPad = 0.0, boundDamping = -.5,
+                 g = arr([0.0,-1.0])):
         self.dt = dt
-        self.g    = arr([0.0,-1.0])
+        self.g    = g
         self.xmin = xmin
         self.xmax = xmax
         self.ymin = ymin
         self.ymax = ymax
+        
+        self.boundDamping = boundDamping
+        self.boundPad = boundPad
 
 #                                 World
 # =============================================================================
@@ -108,7 +112,7 @@ class World():
 class ParticleSystem():
     #                         Init
     # =========================================================
-    def __init__(self,world,nx=10,ny=10,k=0.1,eta=1.0):
+    def __init__(self,world,kernels,nx=10,ny=10,k=0.1,eta=1.0,mass=1.0,rho0=1.0):
         # Constants
         # ================================
         # viscosity
@@ -125,15 +129,18 @@ class ParticleSystem():
         n = nx*ny
         self.n  = n
 #        x,y = np.meshgrid(np.linspace(.25,.5,nx),np.linspace(.25,.5,ny))
-        dx = (world.xmax-world.xmin)/(nx+2)
-        dy = (world.ymax-world.ymin)/(ny+2)
-        x,y = np.meshgrid(np.linspace(world.xmin+dx,world.xmax-dx,nx),np.linspace(world.ymin+dy,world.ymax-dy,ny))
+#        dx = (world.xmax-world.xmin)/(nx+1)
+#        dy = (world.ymax-world.ymin)/(ny+1)
+        dx = kernels.h
+        dy = kernels.h
 #        x,y = np.meshgrid(np.linspace(world.xmin+dx,world.xmax-dx,nx),np.linspace(world.ymin+dy,world.ymax-dy,ny))
-        dx = x[0,1] - x[0,0]
-        dy = y[1,0] - y[0,0]
-        self.x = x.flatten()
-        self.y = y.flatten()
-
+        x0 = world.xmin+(world.xmax-world.xmin)/4.0
+        y0 = world.ymin+dy
+        x,y = np.meshgrid(np.linspace(x0,x0+nx*dx,nx),np.linspace(y0,y0+ny*dy,ny))
+#        x,y = np.meshgrid(np.linspace(world.xmin+world.xmax/4.0,world.xmax/2.0,nx),np.linspace(world.ymin+16.0,world.ymin+16.0+16.0*ny,ny))
+        self.x = x.flatten() + np.random.rand(n)*dx*0.25
+        self.y = y.flatten() + np.random.rand(n)*dy*0.25
+        
         
         # velocity
         self.vx = np.zeros(n)
@@ -141,12 +148,12 @@ class ParticleSystem():
         
         # mass
         self.mass = np.ones(n)*dx*dy*np.pi / (np.max(x)-np.min(x)) / (np.max(y)-np.min(y))
-        
+#        self.mass = np.ones(n)*mass
         # density
         self.rho  = np.zeros(n)
         
         # Reference density
-        self.rho0  = np.ones(n)
+        self.rho0  = np.ones(n)*rho0
         
         # pressure
         self.P    = np.zeros(n)
@@ -158,15 +165,17 @@ class ParticleSystem():
         
     #                   Compute Distance
     # =========================================================
-    def computeDistance(self,i,kernels):
+    def computeDistance(self,i,kernels,excludeSelf=False):
         # define handy local variables
         x = self.x
         y = self.y
         h = kernels.h
         # compute distances
+#        sqr_r = (x-x[i])**2 + (y-y[i])**2
         sqr_r = (x[i]-x)**2 + (y[i]-y)**2
         J = sqr_r<h**2
-#        J[i] = False
+        if excludeSelf:
+            J[i] = False
         
         sqr_r = sqr_r[J]
         r = np.sqrt(sqr_r)
@@ -212,9 +221,9 @@ class ParticleSystem():
         Pi   = self.P[i]
         Pj   = self.P[J]
         rhoj = self.rho[J]
-        
+        rrr = r
         gradW = kernels.spiky_computeGradientWeight(r,R)
-        return np.sum( - (mj*( Pi+Pj/(2.0*rhoj) )*gradW) ) 
+        return np.sum(- (mj*(Pi+Pj)/(2.0*rhoj)*gradW) , 1) 
         
     
     def computeViscosityForce(self,i,J,r,R,kernels):
@@ -229,8 +238,8 @@ class ParticleSystem():
         
         laplacianW = kernels.viscosity_computeLaplacianWeight(r)
         
-        Visc_f_x = eta * np.sum( mj*(vxj-vxi)/rhoj*laplacianW )
-        Visc_f_y = eta * np.sum( mj*(vyj-vyi)/rhoj*laplacianW )
+        Visc_f_x =  np.sum( eta*mj*(vxj-vxi)/rhoj*laplacianW )
+        Visc_f_y = np.sum( eta*mj*(vyj-vyi)/rhoj*laplacianW )
 
         return arr([Visc_f_x , Visc_f_y])
 
