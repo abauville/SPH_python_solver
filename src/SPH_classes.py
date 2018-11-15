@@ -23,15 +23,15 @@ class Kernels():
         # kernel factors
         self.h       = h
         
-        # coeff 3D
-        self.poly6_fac              = 315.0/(64.0 * np.pi * h**9)     
-        self.spiky_gradientFac      = -45.0/(       np.pi * h**6)
-        self.viscosity_laplacianFac =  45.0/(       np.pi * h**6)
-#        
-#        # coeff 2D
-#        self.poly6_fac              =   4.0/(       np.pi * h**8)        
-#        self.spiky_gradientFac      = -30.0/(       np.pi * h**5)
-#        self.viscosity_laplacianFac =  20.0/( 3.0 * np.pi * h**5)
+#        # coeff 3D
+#        self.poly6_fac              = 315.0/(64.0 * np.pi * h**9)     
+#        self.spiky_gradientFac      = -45.0/(       np.pi * h**6)
+#        self.viscosity_laplacianFac =  45.0/(       np.pi * h**6)
+        
+        # coeff 2D
+        self.poly6_fac              =   4.0/(       np.pi * h**8)        
+        self.spiky_gradientFac      = -30.0/(       np.pi * h**5)
+        self.viscosity_laplacianFac =  20.0/( 3.0 * np.pi * h**5)
         
     # Poly 6
     # =====================================================
@@ -50,7 +50,7 @@ class Kernels():
         h = self.h
         fac = self.spiky_gradientFac
         
-        return fac * (h - r)**2 * R/r
+        return fac * (h - r)**2 * R
         
     
     # Viscosity
@@ -126,15 +126,18 @@ class ParticleSystem():
         self.n  = n
 #        x,y = np.meshgrid(np.linspace(.25,.5,nx),np.linspace(.25,.5,ny))
         x,y = np.meshgrid(np.linspace(world.xmin,world.xmax,nx),np.linspace(world.ymin,world.ymax,ny))
+        dx = x[0,1] - x[0,0]
+        dy = y[1,0] - y[0,0]
         self.x = x.flatten()
         self.y = y.flatten()
+
         
         # velocity
         self.vx = np.zeros(n)
         self.vy = np.zeros(n)
         
         # mass
-        self.mass = np.ones(n)
+        self.mass = np.ones(n)*dx*dy*np.pi
         
         # density
         self.rho  = np.zeros(n)
@@ -166,9 +169,13 @@ class ParticleSystem():
         r = np.sqrt(sqr_r)
         
         R = arr([ 
-                 [x[i] - x[J] ],
-                 [y[i] - y[J] ]
+                 x[i] - x[J] ,
+                 y[i] - y[J] 
                 ])
+    
+        I = r>0
+        R[:,I] = R[:,I]/r[I]
+        R[:,~I] = arr([[0.0,0.0]]).T
 
         return r, sqr_r, R, J
     
