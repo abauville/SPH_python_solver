@@ -4,7 +4,7 @@
 Created on Wed Nov 14 10:24:08 2018
 @author: abauville
 
-SPH solver
+Set of classes for the SPH solver
 """
 
 
@@ -23,6 +23,8 @@ class Kernels():
         # kernel factors
         self.h       = h
         
+        self.h_sqr = h**2
+        
 #        # coeff 3D
 #        self.poly6_fac              = 315.0/(64.0 * np.pi * h**9)     
 #        self.spiky_gradientFac      = -45.0/(       np.pi * h**6)
@@ -35,31 +37,20 @@ class Kernels():
         
     # Poly 6
     # =====================================================
-    def poly6_computeWeight(self,sqr_r):
-        # i is the index of a given particle
-        h = self.h
-        fac = self.poly6_fac
-        
-        # Return weights
-        return fac * (h**2 - sqr_r)**3
+    def poly6_computeWeight(self,r_sqr):        
+        return self.poly6_fac * (self.h_sqr - r_sqr)**3
        
         
     # Spiky
     # =====================================================
     def spiky_computeGradientWeight(self, r, R):
-        h = self.h
-        fac = self.spiky_gradientFac
-        
-        return fac * (h - r)**2 * R
+        return self.spiky_gradientFac * (self.h - r)**2 * R
         
     
     # Viscosity
     # =====================================================
     def viscosity_computeLaplacianWeight(self, r):
-        h = self.h
-        fac = self.viscosity_laplacianFac
-        
-        return fac * (h - r)
+        return self.viscosity_laplacianFac * (self.h - r)
 
 
     
@@ -165,43 +156,51 @@ class ParticleSystem():
         
     #                   Compute Distance
     # =========================================================
-    def computeDistance(self,i,kernels,excludeSelf=False):
+    #@profile
+    def computeDistanceSqr(self,i,kernels):
         # define handy local variables
         x = self.x
         y = self.y
         h = kernels.h
         # compute distances
-#        sqr_r = (x-x[i])**2 + (y-y[i])**2
-        sqr_r = (x[i]-x)**2 + (y[i]-y)**2
-        J = sqr_r<h**2
-        if excludeSelf:
-            J[i] = False
+        r_sqr = (x[i]-x)**2 + (y[i]-y)**2
+        J = (r_sqr<h**2)
         
-        sqr_r = sqr_r[J]
-        r = np.sqrt(sqr_r)
+        r_sqr = r_sqr[J]
+        return r_sqr, J
+    
+#    @profile
+    def computeDistance(self,i,kernels):
+        # define handy local variables
+        x = self.x
+        y = self.y
+        xi = x[i]
+        yi = y[i]
+        # compute distances
+        r_sqr = (xi-x)**2 + (yi-y)**2
+        J = (r_sqr<kernels.h_sqr)
+        J[i] = False
+        
+        r_sqr = r_sqr[J]
+        r = np.sqrt(r_sqr)
         
         R = arr([ 
-                 x[i] - x[J] ,
-                 y[i] - y[J] 
-                ])
+                 xi - x[J] ,
+                 yi - y[J] 
+                ]) / r
     
-        I = r>0
-        R[:,I] = R[:,I]/r[I]
-        R[:,~I] = arr([[0.0,0.0]]).T
 
-        return r, sqr_r, R, J
-    
-    
-    
+        return r, r_sqr, R, J
     
     
     
     
     #               Compute Density, Pressure
     # =========================================================
-    def computeDensity(self,i,J,sqr_r,kernels):
-        W = kernels.poly6_computeWeight(sqr_r)
-        self.rho[i] = np.sum(self.mass[J]*W)
+    #@profile
+    def computeDensity(self,i,J,r_sqr,kernels):
+        W = kernels.poly6_computeWeight(r_sqr)
+        self.rho[i] = self.mass[J] @ W
         
         
     def computePressure(self,i):
@@ -216,32 +215,19 @@ class ParticleSystem():
         
     #                     Compute Forces
     # =========================================================
+    #@profile
     def computePressureForce(self,i,J,r,R,kernels):
-        mj   = self.mass[J]
-        Pi   = self.P[i]
-        Pj   = self.P[J]
-        rhoj = self.rho[J]
-        rrr = r
         gradW = kernels.spiky_computeGradientWeight(r,R)
-        return np.sum(- (mj*(Pi+Pj)/(2.0*rhoj)*gradW) , 1) 
-        
-    
-    def computeViscosityForce(self,i,J,r,R,kernels):
-        mj   = self.mass[J]
-        rhoj = self.rho[J]
-        eta  = self.eta
-        
-        vxi  = self.vx[i]
-        vxj  = self.vx[J]
-        vyi  = self.vy[i]
-        vyj  = self.vy[J]
-        
-        laplacianW = kernels.viscosity_computeLaplacianWeight(r)
-        
-        Visc_f_x =  np.sum( eta*mj*(vxj-vxi)/rhoj*laplacianW )
-        Visc_f_y = np.sum( eta*mj*(vyj-vyi)/rhoj*laplacianW )
+        Fac = - self.mass[J]*(self.P[i]+self.P[J])/(2.0*self.rho[J])
+#        return np.sum(- (self.mass[J]*(self.P[i]+self.P[J])/(2.0*self.rho[J])*gradW) , 1) 
+        return arr([ Fac @ gradW[0,:], Fac@gradW[1,:] ])
 
-        return arr([Visc_f_x , Visc_f_y])
+        
+    #@profile
+    def computeViscosityForce(self,i,J,r,kernels):        
+        laplacianW = kernels.viscosity_computeLaplacianWeight(r)        
+        Fac = self.eta*self.mass[J]/self.rho[J]*laplacianW
+        return arr([Fac @ (self.vx[J]-self.vx[i]) , Fac @ (self.vy[J]-self.vy[i])])
 
 
     def computeGravityForce(self,i,world):
