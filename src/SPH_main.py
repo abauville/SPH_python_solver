@@ -21,11 +21,12 @@ from matplotlib.animation import FuncAnimation
 #@profile
 def main():
     # Create main objects
-    kernels = SPH.Kernels(h=0.05)
-    world   = SPH.World(dt=0.005,boundPad=0.00,boundDamping=0.5)
-    ps = SPH.ParticleSystem(world,kernels,nx=15,ny=15,k=1.0,eta=2.0)
+    kernels = SPH.Kernels(h=0.032)
+    world   = SPH.World(dt=0.005,boundPad=0.00,boundDamping=1.0)
+    ps = SPH.ParticleSystem(world,kernels,nx=15,ny=15,k=10.0,eta=1.0)
     
     nt = 300
+    plt.figure(2)
     plt.clf()
     
     line, = plt.plot(ps.x, ps.y,'.')
@@ -37,7 +38,7 @@ def main():
     for it in range(nt):
         tic = time.time()
         # Compute density and pressure
-    #     ========================================================
+        # ========================================================
         for iP in range(ps.n):
             r_sqr, J = ps.computeDistanceSqr(iP,kernels)
             ps.computeDensity(iP,J,r_sqr,kernels)
@@ -95,7 +96,7 @@ def main():
         # ========================================================
     
         
-        if it%5==0:
+        if it%10==0:
             tic = time.time()
     #    plt.cla()
             line.set_xdata(ps.x)

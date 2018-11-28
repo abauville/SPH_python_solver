@@ -23,8 +23,8 @@ ymax = .5
 W = xmax-xmin
 H = ymax-ymin
 
-nx = 30
-ny = 30
+nx = 50
+ny = 50
 n  = nx*ny
 
 
@@ -51,10 +51,10 @@ size = np.ones(n)*200.0
 collide = np.zeros(n)
 m = 1.0
 k = 1.0
-nt = 2000
+nt = 500
 dt = 0.05
 
-plt.cla()
+plt.clf()
 markers, = plt.plot(x,y,'o',markersize=1.0)
 plt.xlim([xmin,xmax])
 plt.ylim([ymin,ymax])
@@ -104,11 +104,7 @@ for it in range(nt):
     
     if it%5==0:
         markers.set_data(x,y)
+        plt.pause(.00001)
         print('it = %04d, fps=%.2f' % (it, 1.0/(time()-tic)))
         tic = time()
-    
-    
-        
-        if renderer=='mp':
-            plt.pause(.00001)
-#        plt.cla()
+

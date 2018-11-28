@@ -119,19 +119,39 @@ class ParticleSystem():
         self.ny = ny
         n = nx*ny
         self.n  = n
-#        x,y = np.meshgrid(np.linspace(.25,.5,nx),np.linspace(.25,.5,ny))
-#        dx = (world.xmax-world.xmin)/(nx+1)
-#        dy = (world.ymax-world.ymin)/(ny+1)
-        dx = kernels.h
-        dy = kernels.h
-#        x,y = np.meshgrid(np.linspace(world.xmin+dx,world.xmax-dx,nx),np.linspace(world.ymin+dy,world.ymax-dy,ny))
-        x0 = world.xmin+(world.xmax-world.xmin)/4.0
-        y0 = world.ymin+dy
-        x,y = np.meshgrid(np.linspace(x0,x0+nx*dx,nx),np.linspace(y0,y0+ny*dy,ny))
-#        x,y = np.meshgrid(np.linspace(world.xmin+world.xmax/4.0,world.xmax/2.0,nx),np.linspace(world.ymin+16.0,world.ymin+16.0+16.0*ny,ny))
-        self.x = x.flatten() + np.random.rand(n)*dx*0.25
-        self.y = y.flatten() + np.random.rand(n)*dy*0.25
+##        x,y = np.meshgrid(np.linspace(.25,.5,nx),np.linspace(.25,.5,ny))
+##        dx = (world.xmax-world.xmin)/(nx+1)
+##        dy = (world.ymax-world.ymin)/(ny+1)
+#        dx = kernels.h
+#        dy = kernels.h
+##        x,y = np.meshgrid(np.linspace(world.xmin+dx,world.xmax-dx,nx),np.linspace(world.ymin+dy,world.ymax-dy,ny))
+#        x0 = world.xmin+(world.xmax-world.xmin)/4.0
+#        y0 = world.ymin+dy
+#        x,y = np.meshgrid(np.linspace(x0,x0+nx*dx,nx),np.linspace(y0,y0+ny*dy,ny))
+##        x,y = np.meshgrid(np.linspace(world.xmin+world.xmax/4.0,world.xmax/2.0,nx),np.linspace(world.ymin+16.0,world.ymin+16.0+16.0*ny,ny))
+#        self.x = x.flatten() + np.random.rand(n)*dx*0.25
+#        self.y = y.flatten() + np.random.rand(n)*dy*0.25
+#        
         
+        Wbox = world.xmax - world.xmin
+        Hbox = world.ymax - world.ymin
+        dx = Wbox/(nx)
+        dy = Hbox/(ny)
+        
+        print("h = %.5g" %( 0.49*np.min([dx,dy])))
+
+        leftPad     =  Wbox*.25
+        rightPad    = -Wbox*.25
+        bottomPad   =  .5*dy
+        topPad      = -Hbox*.25
+        
+        
+        x,y = np.meshgrid(
+                np.linspace(world.xmin+leftPad,world.xmax+rightPad,nx),
+                np.linspace(world.ymin+bottomPad,world.ymax+topPad,ny)
+                         )
+        self.x = x.flatten()+(np.random.rand(n)-.5)*0.1*dx
+        self.y = y.flatten()+(np.random.rand(n)-.5)*0.1*dy
         
         # velocity
         self.vx = np.zeros(n)
