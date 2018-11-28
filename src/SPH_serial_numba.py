@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import array as arr
 from time import time
-from numba import jit
-import gr as gr
+from numba import jit, njit, prange
+import gr.pygr as gr
 #import gr.pygr as gr
 
 
@@ -25,8 +25,8 @@ ymax = .5
 Wbox = xmax-xmin
 Hbox = ymax-ymin
 
-nx = 30
-ny = 30
+nx = 50
+ny = 50
 n  = nx*ny
 
 
@@ -68,7 +68,7 @@ collide = np.zeros(n)
 m = 1.0
 k = 1.0
 nt = 1000
-dt = 0.004
+dt = 0.0025
 
 plt.figure(1)
 plt.clf()
@@ -102,14 +102,14 @@ gravity = arr([0.0,-1.0])
 boundPad = 0
 boundDamping = 0.5
 
-
-@jit(nopython=True)
+@jit(nopython=True,parallel=True)
+#@jit(nopython=True)
 def computeDensityPressure(n,x,y,h_sqr,
                            poly6_fac,
                            rho,P,k,rho0):
     # Compute density and pressure
     # ========================================================
-    for iP in range(n):
+    for iP in prange(n):
         rho[iP] = 0.0
         P[iP] = 0.0
         for jP in range(n):
@@ -123,7 +123,8 @@ def computeDensityPressure(n,x,y,h_sqr,
                 # Compute Pressure
                 P[iP] += k * (rho[iP]-rho0[iP])
                         
-@jit(nopython=True)       
+@jit(nopython=True,parallel=True)
+#@jit(nopython=True)       
 def updateAcceleration(n,x,y,
                        h,h_sqr,
                        spiky_gradientFac,viscosity_laplacianFac,
@@ -131,7 +132,7 @@ def updateAcceleration(n,x,y,
                        vx,vy,ax,ay    ):
     # Compute forces 
     # ========================================================
-    for iP in range(n):
+    for iP in prange(n):
         ax[iP] = 0.0
         ay[iP] = 0.0
         for jP in range(n):
@@ -167,8 +168,8 @@ def updateAcceleration(n,x,y,
     # end iP
 
         
-        
-@jit(nopython=True)          
+#@jit(nopython=True,parallel=True)   
+#@jit(nopython=True)          
 def updatePosition(x,y,vx,vy,ax,ay,dt,
                    xmin,xmax,ymin,ymax):
     vx += ax*dt
@@ -194,7 +195,7 @@ def updatePosition(x,y,vx,vy,ax,ay,dt,
     vy[I] = boundDamping*-np.abs(vy[I])
     
     
-#    for iP in range(n):
+#    for iP in prange(n):
 #        vx[iP] += ax[iP]*dt
 #        vy[iP] += ay[iP]*dt
 #        x[iP]  += vx[iP]*dt
@@ -245,12 +246,13 @@ for it in range(nt):
     simTime += time()-tic
     
     if it%5==0:
-        gr.plot(x,y)
         tic = time()
-#        markers.set_data(x,y)
-#        plt.pause(1e-10)
-#        plt.title('timestep=%i/%i' % (it+1,nt))
-##        print('it = %04d, fps=%.2f' % (it, 1.0/(time()-tic)))
+#        gr.plot(x,y,'.')
+        
+        markers.set_data(x,y)
+        plt.pause(1e-10)
+        plt.title('timestep=%i/%i' % (it+1,nt))
+#        print('it = %04d, fps=%.2f' % (it, 1.0/(time()-tic)))
         renderTime += time()-tic
 
 print("sim time     = %.2f" % simTime)
