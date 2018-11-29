@@ -11,9 +11,10 @@ SPH solver serial version
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import array as arr
-from time import time
+import time
 from numba import jit, njit, prange
-import gr.pygr as gr
+
+import gr
 #import gr.pygr as gr
 
 
@@ -67,14 +68,17 @@ size = np.ones(n)*200.0
 collide = np.zeros(n)
 m = 1.0
 k = 1.0
-nt = 1000
-dt = 0.0025
+nt = 500
+dt = 0.002
 
-plt.figure(1)
+fig = plt.figure(1)
 plt.clf()
-markers, = plt.plot(x,y,'.')
+markers, = plt.plot(x,y,'o',markersize=1.0)
 plt.xlim([xmin*1.05,xmax*1.05])
 plt.ylim([ymin*1.05,ymax*1.05])
+
+#gr.pygr.mlab.xlim([xmin*1.05,xmax*1.05])
+#gr.pygr.mlab.ylim([ymin*1.05,ymax*1.05])
 
 
 mass = np.ones(n)*dx*dy*np.pi / (np.max(x)-np.min(x)) / (np.max(y)-np.min(y))
@@ -87,7 +91,7 @@ P    = np.zeros(n)
 
 
 # Equation of state (EOS) factor
-k = 1.0
+k = 2.0
 
 # material properties
 eta = 1.0
@@ -111,7 +115,6 @@ def computeDensityPressure(n,x,y,h_sqr,
     # ========================================================
     for iP in prange(n):
         rho[iP] = 0.0
-        P[iP] = 0.0
         for jP in range(n):
             # Compute distance sqr
             r_sqr = (x[iP]-x[jP])**2 + (y[iP]-y[jP])**2
@@ -120,8 +123,9 @@ def computeDensityPressure(n,x,y,h_sqr,
                 W = poly6_fac * (h_sqr - r_sqr)**3
                 rho[iP] += mass[jP] * W
                 
-                # Compute Pressure
-                P[iP] += k * (rho[iP]-rho0[iP])
+            
+        # Compute Pressure
+        P[iP] = k * (rho[iP]-rho0[iP])
                         
 @jit(nopython=True,parallel=True)
 #@jit(nopython=True)       
@@ -133,40 +137,41 @@ def updateAcceleration(n,x,y,
     # Compute forces 
     # ========================================================
     for iP in prange(n):
-        ax[iP] = 0.0
-        ay[iP] = 0.0
+        ax[iP] = 0.0;       ay[iP] = 0.0
+        xi = x[iP];         yi = y[iP]
+        axi = ax[iP];       ayi = ay[iP]
+        vxi = vx[iP];       vyi = vy[iP]
+        Pi = P[iP]
         for jP in range(n):
             if jP==iP:
                 continue
             
-            r_sqr = (x[iP]-x[jP])**2 + (y[iP]-y[jP])**2
+            r_sqr = (xi-x[jP])**2 + (yi-y[jP])**2
             if r_sqr<h_sqr:                
                 r = np.sqrt(r_sqr)
-                R = arr([x[iP] - x[jP] ,
-                         y[iP] - y[jP] ]) / r
+                R = arr([xi - x[jP] ,
+                         yi - y[jP] ]) / r
 
                 # Compute pressure force
                 gradW = spiky_gradientFac * (h - r)**2 * R
-                Fac = - mass[jP]*(P[iP]+P[jP])/(2.0*rho[jP])
-                ax[iP] += Fac * gradW[0]
-                ay[iP] += Fac * gradW[1]
+                Fac = - mass[jP]*(Pi+P[jP])/(2.0*rho[jP])
+                axi += Fac * gradW[0]
+                ayi += Fac * gradW[1]
                 
                 # Compute viscous force
                 laplacianW = viscosity_laplacianFac * (h - r)
                 Fac = eta*mass[jP]/rho[jP]*laplacianW
-                ax[iP] += Fac * (vx[jP]-vx[iP])
-                ay[iP] += Fac * (vy[jP]-vy[iP])
+                axi += Fac * (vx[jP]-vxi)
+                ayi += Fac * (vy[jP]-vyi)
         
                 
             # end if dist
         # end jP
-        ax[iP] += rho[iP]*gravity[0]
-        ay[iP] += rho[iP]*gravity[1]
+        axi += rho[iP]*gravity[0]
+        ayi += rho[iP]*gravity[1]
         
-        ax[iP] /= rho[iP]
-        ay[iP] /= rho[iP]
-    # end iP
-
+        ax[iP] = axi/rho[iP]
+        ay[iP] = ayi/rho[iP]
         
 #@jit(nopython=True,parallel=True)   
 #@jit(nopython=True)          
@@ -231,8 +236,10 @@ updateAcceleration(n,x,y,
 updatePosition(x,y,vx,vy,ax,ay,dt,
                xmin,xmax,ymin,ymax)
 
+plt.ion()
+
 for it in range(nt):
-    tic = time()
+    tic = time.time()
     computeDensityPressure(n,x,y,h_sqr,
                            poly6_fac,
                            rho,P,k,rho0)
@@ -243,17 +250,21 @@ for it in range(nt):
                        vx,vy,ax,ay    )
     updatePosition(x,y,vx,vy,ax,ay,dt,
                    xmin,xmax,ymin,ymax)
-    simTime += time()-tic
+    simTime += time.time()-tic
     
     if it%5==0:
-        tic = time()
-#        gr.plot(x,y,'.')
+        tic = time.time()
+#        gr.pygr.mlab.plot(x,y,'.')
         
         markers.set_data(x,y)
-        plt.pause(1e-10)
         plt.title('timestep=%i/%i' % (it+1,nt))
-#        print('it = %04d, fps=%.2f' % (it, 1.0/(time()-tic)))
-        renderTime += time()-tic
+        plt.draw()
+        fig.canvas.flush_events()  
+
+
+#        print('it = %04d, fps=%.2f' % (it, 1.0/(time.time()-tic)))
+        renderTime += time.time()-tic
+
 
 print("sim time     = %.2f" % simTime)
 print("render time  = %.2f" % renderTime)
