@@ -80,8 +80,8 @@ viscosity_laplacianFac =  20.0/( 3.0 * np.pi * h**5)
 
 
 # Define time stuff
-nt = 500
-dt = 0.004
+nt = 1500
+dt = 0.003
 
 
 
@@ -104,6 +104,7 @@ plt.ylim([ymin*1.05,ymax*1.05])
 def computeDensityPressure(n,x,y,
                            h_sqr,
                            poly6_fac,
+                           mass,
                            rho,P,k,rho0):
 
     for iP in prange(n):
@@ -211,7 +212,7 @@ renderTime = 0
 # Call once for compilation (just useful for timing)
 computeDensityPressure(n,x,y,
                        h_sqr,
-                       poly6_fac,
+                       poly6_fac,mass,
                        rho,P,k,rho0)
 updateAcceleration(n,x,y,
                        h,h_sqr,
@@ -229,7 +230,7 @@ for it in range(nt):
     tic = time.time()
     computeDensityPressure(n,x,y,
                            h_sqr,
-                           poly6_fac,
+                           poly6_fac,mass,
                            rho,P,k,rho0)
     updateAcceleration(n,x,y,
                        h,h_sqr,
